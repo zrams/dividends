@@ -12,12 +12,12 @@ Stock lookup list sourced from excel spreadsheet with stock symbol in column B
 
 <h2>Output</h2>
 The following headings will be created, and data for each stock symbol will be populated in the corresponding column:</br>
-<ul>
-<li>A1 - Name</ul>
-<li>B1 - Symbol</ul>
-<li>C1 - Yield</ul>
-<li>D1 - 1yr Revenue Growth %</ul>
-<li>E1 - Payout Ratio</ul>
-<li>F1 - 5yr Yield Avg</ul>
-<li>G1 - 1 Year Return %</li>
-</ul>
+</br>
+A1 - Name</br>
+B1 - Symbol</br>
+C1 - Yield</br>
+D1 - 1yr Revenue Growth % </br>
+E1 - Payout Ratio</br>
+F1 - 5yr Yield Avg</br>
+G1 - 1 Year Return %</br>
+</br></br>
