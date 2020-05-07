@@ -11,7 +11,7 @@ Python 3.8 <br/>
 Stock lookup list sourced from excel spreadsheet with stock symbol in column B
 
 <h2>Output</h2>
-The following headings will be created, and data for each stock symbol will be populated in the corresponding column:
+The following headings will be created, and data for each stock symbol will be populated in the corresponding column:</br>
 <ul>
 <li>A1 - Name</ul>
 <li>B1 - Symbol</ul>
