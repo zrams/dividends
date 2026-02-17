@@ -2,8 +2,16 @@ import SwiftUI
 import Observation
 
 struct AdminDashboardView: View {
+    private enum AdminPanel: String, CaseIterable, Identifiable {
+        case dinners = "Dinner Ideas"
+        case familyChoices = "Family Choices"
+
+        var id: String { rawValue }
+    }
+
     @Bindable var authService: AuthService
     @State private var viewModel = AdminDashboardViewModel()
+    @State private var selectedPanel: AdminPanel = .dinners
 
     @State private var editingDinner: DinnerIdea?
     @State private var dinnerPendingDelete: DinnerIdea?
@@ -24,73 +32,30 @@ struct AdminDashboardView: View {
         )
     }
 
+    private var weekSelectionBinding: Binding<Date> {
+        Binding(
+            get: { viewModel.selectedWeekStartDate },
+            set: { newDate in
+                viewModel.updateSelectedWeekStart(newDate)
+            }
+        )
+    }
+
     var body: some View {
         Group {
-            if viewModel.isLoading && viewModel.allDinners.isEmpty {
+            if selectedPanel == .dinners && viewModel.isLoading && viewModel.allDinners.isEmpty {
                 ProgressView("Loading dinners...")
+            } else if selectedPanel == .familyChoices &&
+                        viewModel.isLoadingFamilyChoices &&
+                        viewModel.familyChoicesByUser.isEmpty {
+                ProgressView("Loading family choices...")
             } else {
-                List {
-                    Section("Add New Dinner") {
-                        TextField("Dinner name (required)", text: $viewModel.addName)
-                            .textInputAutocapitalization(.words)
-
-                        TextField("Description (optional)", text: $viewModel.addDescription, axis: .vertical)
-                            .lineLimit(2...5)
-
-                        Button {
-                            Task {
-                                _ = await viewModel.addDinner(isAdmin: isAdmin)
-                            }
-                        } label: {
-                            if viewModel.isSaving {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                Text("Add Dinner")
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .disabled(viewModel.isSaving || !isAdmin)
-                    }
-
-                    Section("Dinner Ideas (\(viewModel.allDinners.count))") {
-                        if viewModel.visibleDinners.isEmpty {
-                            ContentUnavailableView(
-                                "No Dinners Found",
-                                systemImage: "fork.knife",
-                                description: Text("Add a dinner above or adjust your search query.")
-                            )
-                        } else {
-                            ForEach(viewModel.visibleDinners) { dinner in
-                                AdminDinnerRow(
-                                    dinner: dinner,
-                                    isAdmin: isAdmin,
-                                    onEdit: { editingDinner = dinner },
-                                    onDelete: {
-                                        dinnerPendingDelete = dinner
-                                        showDeleteConfirmation = true
-                                    }
-                                )
-                                .onAppear {
-                                    viewModel.loadMoreIfNeeded(currentItem: dinner)
-                                }
-                            }
-                        }
-
-                        if viewModel.canLoadMore {
-                            HStack {
-                                Spacer()
-                                ProgressView("Loading more...")
-                                Spacer()
-                            }
-                            .onAppear {
-                                viewModel.loadMoreIfNeeded(currentItem: nil)
-                            }
-                        }
-                    }
+                if selectedPanel == .dinners {
+                    dashboardList
+                        .searchable(text: $viewModel.searchText, prompt: "Search dinners")
+                } else {
+                    dashboardList
                 }
-                .listStyle(.insetGrouped)
-                .searchable(text: $viewModel.searchText, prompt: "Search dinners")
             }
         }
         .navigationTitle("Admin Dashboard")
@@ -141,6 +106,128 @@ struct AdminDashboardView: View {
         }
     }
 
+    private var dashboardList: some View {
+        List {
+            Section {
+                Picker("Admin Panel", selection: $selectedPanel) {
+                    ForEach(AdminPanel.allCases) { panel in
+                        Text(panel.rawValue).tag(panel)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            switch selectedPanel {
+            case .dinners:
+                dinnerManagementSections
+            case .familyChoices:
+                familyChoicesSections
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder
+    private var dinnerManagementSections: some View {
+        Section("Add New Dinner") {
+            TextField("Dinner name (required)", text: $viewModel.addName)
+                .textInputAutocapitalization(.words)
+
+            TextField("Description (optional)", text: $viewModel.addDescription, axis: .vertical)
+                .lineLimit(2...5)
+
+            Button {
+                Task {
+                    _ = await viewModel.addDinner(isAdmin: isAdmin)
+                }
+            } label: {
+                if viewModel.isSaving {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Text("Add Dinner")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .disabled(viewModel.isSaving || !isAdmin)
+        }
+
+        Section("Dinner Ideas (\(viewModel.allDinners.count))") {
+            if viewModel.visibleDinners.isEmpty {
+                ContentUnavailableView(
+                    "No Dinners Found",
+                    systemImage: "fork.knife",
+                    description: Text("Add a dinner above or adjust your search query.")
+                )
+            } else {
+                ForEach(viewModel.visibleDinners) { dinner in
+                    AdminDinnerRow(
+                        dinner: dinner,
+                        isAdmin: isAdmin,
+                        onEdit: { editingDinner = dinner },
+                        onDelete: {
+                            dinnerPendingDelete = dinner
+                            showDeleteConfirmation = true
+                        }
+                    )
+                    .onAppear {
+                        viewModel.loadMoreIfNeeded(currentItem: dinner)
+                    }
+                }
+            }
+
+            if viewModel.canLoadMore {
+                HStack {
+                    Spacer()
+                    ProgressView("Loading more...")
+                    Spacer()
+                }
+                .onAppear {
+                    viewModel.loadMoreIfNeeded(currentItem: nil)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var familyChoicesSections: some View {
+        Section("Family Choices") {
+            DatePicker(
+                "Week Starting (Monday)",
+                selection: weekSelectionBinding,
+                displayedComponents: .date
+            )
+
+            Text("Live submissions for week of \(formattedDate(viewModel.selectedWeekStartDate)).")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+
+        Section("Member Submissions") {
+            if viewModel.isLoadingFamilyChoices && viewModel.familyChoicesByUser.isEmpty {
+                ProgressView("Loading submissions...")
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else if viewModel.familyChoicesByUser.isEmpty {
+                ContentUnavailableView(
+                    "No Submissions Yet",
+                    systemImage: "tray",
+                    description: Text("No family member submissions found for this week.")
+                )
+            } else {
+                ForEach(viewModel.familyChoicesByUser) { choiceGroup in
+                    FamilyChoicesRow(choiceGroup: choiceGroup)
+                }
+            }
+        }
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
     private func saveDinnerEdits(dinnerID: String, name: String, description: String) {
         Task {
             let success = await viewModel.updateDinner(
@@ -168,6 +255,29 @@ struct AdminDashboardView: View {
                 self.dinnerPendingDelete = nil
             }
         }
+    }
+}
+
+private struct FamilyChoicesRow: View {
+    let choiceGroup: AdminDashboardViewModel.FamilyChoicesByUser
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(choiceGroup.userName)
+                .font(.headline)
+
+            if choiceGroup.choiceNames.isEmpty {
+                Text("No dinner choices submitted.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(choiceGroup.choiceNames, id: \.self) { choiceName in
+                    Text("• \(choiceName)")
+                        .font(.subheadline)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

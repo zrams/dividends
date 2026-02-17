@@ -9,6 +9,7 @@ Native iPhone SwiftUI app scaffold with:
 - Tab-based navigation
 - Admin dashboard with searchable dinner management
 - Member submission flow with duplicate-week protection
+- Admin family choices view with live weekly submission updates
 - Firestore-backed dinner ideas + weekly submission flow
 - Firebase Messaging hooks for push notifications
 
@@ -119,6 +120,7 @@ In Xcode target **Signing & Capabilities**:
 Document ID = Firebase Auth UID
 
 - `role: String` (`admin` or `member`)
+- `name: String` (optional display name for admin Family Choices view)
 
 ### Collection: `dinners`
 
@@ -162,6 +164,10 @@ Saved by `MemberSubmissionView` for `role == member`:
 - Add dinner form (name required, description optional)
 - Per-row Edit/Delete actions
 - Lazy list expansion in chunks for larger dinner lists
+- "Family Choices" panel with DatePicker for week selection (defaults to upcoming Monday)
+- Live Firestore listener on `submissions` filtered by selected `weekStart`
+- Grouped display by family member (`users/{uid}` lookup for names)
+- Choice ID to dinner-name mapping via the `dinners` listener
 - Loading and error states (`ProgressView`, alerts)
 
 Admin write operations are guarded in both UI and view-model methods.

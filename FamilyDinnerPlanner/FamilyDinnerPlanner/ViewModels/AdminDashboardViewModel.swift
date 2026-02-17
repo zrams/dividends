@@ -5,8 +5,18 @@ import Observation
 @MainActor
 @Observable
 final class AdminDashboardViewModel {
+    struct FamilyChoicesByUser: Identifiable, Hashable {
+        let id: String
+        let userName: String
+        let choiceNames: [String]
+    }
+
     private let db = Firestore.firestore()
     private var dinnersListener: ListenerRegistration?
+    private var submissionsListener: ListenerRegistration?
+    private var userListeners: [String: ListenerRegistration] = [:]
+    private var submissionChoicesByUser: [String: [String]] = [:]
+    private var userDisplayNames: [String: String] = [:]
     private let lazyPageSize = 25
     private var visibleCount = 25
 
@@ -16,6 +26,8 @@ final class AdminDashboardViewModel {
     var addDescription = ""
     var isLoading = false
     var isSaving = false
+    var selectedWeekStartDate = Date.nextMonday(after: .now)
+    var isLoadingFamilyChoices = false
     var errorMessage: String?
 
     var visibleDinners: [DinnerIdea] {
@@ -37,50 +49,53 @@ final class AdminDashboardViewModel {
         visibleCount < allDinners.count
     }
 
-    func startListening() {
-        guard dinnersListener == nil else { return }
+    var familyChoicesByUser: [FamilyChoicesByUser] {
+        let dinnerNamesByID = Dictionary(uniqueKeysWithValues: allDinners.map { ($0.id, $0.name) })
 
-        isLoading = true
-        errorMessage = nil
-
-        dinnersListener = db
-            .collection("dinners")
-            .order(by: "name")
-            .addSnapshotListener { [weak self] snapshot, error in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-
-                    if let error {
-                        self.errorMessage = error.localizedDescription
-                        self.isLoading = false
-                        return
-                    }
-
-                    let documents = snapshot?.documents ?? []
-                    self.allDinners = documents.map { document in
-                        DinnerIdea(
-                            id: document.documentID,
-                            name: document.data()["name"] as? String ?? "Untitled Dinner",
-                            description: document.data()["description"] as? String
-                        )
-                    }
-
-                    let minimumVisible = min(self.lazyPageSize, self.allDinners.count)
-                    if self.visibleCount < minimumVisible {
-                        self.visibleCount = minimumVisible
-                    }
-                    if self.visibleCount > self.allDinners.count {
-                        self.visibleCount = self.allDinners.count
-                    }
-
-                    self.isLoading = false
-                }
+        return submissionChoicesByUser
+            .map { userID, rawChoices in
+                let uniqueChoices = Self.uniqueValues(from: rawChoices)
+                let readableChoices = uniqueChoices.map { dinnerNamesByID[$0] ?? $0 }
+                let resolvedName = userDisplayNames[userID] ?? userID
+                return FamilyChoicesByUser(
+                    id: userID,
+                    userName: resolvedName,
+                    choiceNames: readableChoices
+                )
             }
+            .sorted { lhs, rhs in
+                lhs.userName.localizedCaseInsensitiveCompare(rhs.userName) == .orderedAscending
+            }
+    }
+
+    func startListening() {
+        startDinnerIdeasListenerIfNeeded()
+        startSubmissionsListener(for: selectedWeekStartDate)
     }
 
     func stopListening() {
         dinnersListener?.remove()
         dinnersListener = nil
+
+        submissionsListener?.remove()
+        submissionsListener = nil
+
+        for listener in userListeners.values {
+            listener.remove()
+        }
+        userListeners.removeAll()
+        userDisplayNames.removeAll()
+        submissionChoicesByUser.removeAll()
+    }
+
+    func updateSelectedWeekStart(_ date: Date) {
+        let normalizedDate = Date.mondayForWeek(containing: date)
+        guard !Calendar.current.isDate(normalizedDate, inSameDayAs: selectedWeekStartDate) else {
+            return
+        }
+
+        selectedWeekStartDate = normalizedDate
+        startSubmissionsListener(for: normalizedDate)
     }
 
     func loadMoreIfNeeded(currentItem: DinnerIdea?) {
@@ -190,5 +205,160 @@ final class AdminDashboardViewModel {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private func startDinnerIdeasListenerIfNeeded() {
+        guard dinnersListener == nil else { return }
+        isLoading = true
+        errorMessage = nil
+
+        dinnersListener = db
+            .collection("dinners")
+            .order(by: "name")
+            .addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+
+                    if let error {
+                        self.errorMessage = error.localizedDescription
+                        self.isLoading = false
+                        return
+                    }
+
+                    let documents = snapshot?.documents ?? []
+                    self.allDinners = documents.map { document in
+                        DinnerIdea(
+                            id: document.documentID,
+                            name: document.data()["name"] as? String ?? "Untitled Dinner",
+                            description: document.data()["description"] as? String
+                        )
+                    }
+
+                    let minimumVisible = min(self.lazyPageSize, self.allDinners.count)
+                    if self.visibleCount < minimumVisible {
+                        self.visibleCount = minimumVisible
+                    }
+                    if self.visibleCount > self.allDinners.count {
+                        self.visibleCount = self.allDinners.count
+                    }
+
+                    self.isLoading = false
+                }
+            }
+    }
+
+    private func startSubmissionsListener(for weekStartDate: Date) {
+        submissionsListener?.remove()
+        submissionsListener = nil
+
+        isLoadingFamilyChoices = true
+        errorMessage = nil
+
+        let weekTimestamp = Timestamp(date: weekStartDate)
+
+        submissionsListener = db
+            .collection("submissions")
+            .whereField("weekStart", isEqualTo: weekTimestamp)
+            .addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+
+                    if let error {
+                        self.errorMessage = error.localizedDescription
+                        self.isLoadingFamilyChoices = false
+                        return
+                    }
+
+                    var groupedChoices: [String: [String]] = [:]
+                    for document in snapshot?.documents ?? [] {
+                        let data = document.data()
+                        guard let userID = data["userId"] as? String else { continue }
+                        let choices = data["choices"] as? [String] ?? []
+                        groupedChoices[userID, default: []].append(contentsOf: choices)
+                    }
+
+                    self.submissionChoicesByUser = groupedChoices
+                    self.syncUserListeners(for: Set(groupedChoices.keys))
+                    self.isLoadingFamilyChoices = false
+                }
+            }
+    }
+
+    private func syncUserListeners(for userIDs: Set<String>) {
+        let existingUserIDs = Set(userListeners.keys)
+        let idsToRemove = existingUserIDs.subtracting(userIDs)
+        let idsToAdd = userIDs.subtracting(existingUserIDs)
+
+        for userID in idsToRemove {
+            userListeners[userID]?.remove()
+            userListeners[userID] = nil
+            userDisplayNames[userID] = nil
+        }
+
+        for userID in idsToAdd {
+            userDisplayNames[userID] = userID
+
+            userListeners[userID] = db.collection("users").document(userID).addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+
+                    if let error {
+                        self.errorMessage = error.localizedDescription
+                        self.userDisplayNames[userID] = userID
+                        return
+                    }
+
+                    self.userDisplayNames[userID] = self.resolveUserName(
+                        from: snapshot?.data(),
+                        fallback: userID
+                    )
+                }
+            }
+        }
+    }
+
+    private func resolveUserName(from data: [String: Any]?, fallback: String) -> String {
+        let candidates: [String?] = [
+            data?["name"] as? String,
+            data?["displayName"] as? String,
+            data?["email"] as? String
+        ]
+
+        for candidate in candidates {
+            let normalized = candidate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+
+        return fallback
+    }
+
+    private static func uniqueValues(from values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { value in
+            seen.insert(value).inserted
+        }
+    }
+}
+
+private extension Date {
+    static func nextMonday(after date: Date) -> Date {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: date)
+        let weekday = calendar.component(.weekday, from: startOfToday)
+        let daysUntilNextMonday = weekday == 2 ? 7 : ((2 - weekday + 7) % 7)
+        let candidateDate = calendar.date(byAdding: .day, value: daysUntilNextMonday, to: startOfToday) ?? startOfToday
+
+        var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: candidateDate)
+        components.weekday = 2
+        return calendar.date(from: components) ?? candidateDate
+    }
+
+    static func mondayForWeek(containing date: Date) -> Date {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        components.weekday = 2
+        return calendar.date(from: components) ?? calendar.startOfDay(for: date)
     }
 }
