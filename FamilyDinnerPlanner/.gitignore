@@ -11,3 +11,7 @@ build/
 
 # Firebase local/dev files
 GoogleService-Info.plist
+
+# Firebase Functions
+firebase/functions/node_modules/
+firebase/.firebase/

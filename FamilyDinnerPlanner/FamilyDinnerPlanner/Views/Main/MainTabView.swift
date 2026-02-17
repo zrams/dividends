@@ -71,6 +71,9 @@ struct MainTabView: View {
         .task {
             await NotificationPermissionService.requestIfNeeded()
         }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
         .onChange(of: authService.userRole) { _, newRole in
             if newRole != .admin && selectedTab == .admin {
                 selectedTab = .ideas
@@ -91,5 +94,14 @@ struct MainTabView: View {
                 Text(authService.roleErrorMessage ?? "Unknown error.")
             }
         )
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme?.lowercased() == "familydinnerplanner" else { return }
+
+        let destination = "\(url.host ?? "")\(url.path)".lowercased()
+        if destination.contains("member-submission") && authService.userRole == .member {
+            selectedTab = .submit
+        }
     }
 }

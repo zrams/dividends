@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseMessaging
 import Observation
 
 @MainActor
@@ -91,6 +92,9 @@ final class AuthService {
                 if let user {
                     self.sessionState = .signedIn(user)
                     self.startUserRoleListener(for: user.uid)
+                    Task {
+                        await self.syncCurrentFCMToken(for: user.uid)
+                    }
                 } else {
                     self.sessionState = .signedOut
                     self.stopUserRoleListener()
@@ -128,5 +132,32 @@ final class AuthService {
     private func stopUserRoleListener() {
         userRoleListener?.remove()
         userRoleListener = nil
+    }
+
+    private func syncCurrentFCMToken(for uid: String) async {
+        do {
+            let fcmToken = try await fetchCurrentFCMToken()
+            guard !fcmToken.isEmpty else { return }
+
+            try await db.collection("users").document(uid).setData(
+                ["fcmToken": fcmToken],
+                merge: true
+            )
+        } catch {
+            print("FCM sync failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func fetchCurrentFCMToken() async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            Messaging.messaging().token { token, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                continuation.resume(returning: token ?? "")
+            }
+        }
     }
 }

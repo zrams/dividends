@@ -1,0 +1,26 @@
+{
+  "name": "functions",
+  "version": "1.0.0",
+  "description": "Cloud Functions for FamilyDinnerPlanner reminders",
+  "main": "index.js",
+  "scripts": {
+    "lint": "node --check index.js",
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions:sendWeeklyDinnerChoiceReminders",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "keywords": [
+    "firebase",
+    "functions",
+    "fcm"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "firebase-admin": "^13.6.1",
+    "firebase-functions": "^7.0.5"
+  }
+}

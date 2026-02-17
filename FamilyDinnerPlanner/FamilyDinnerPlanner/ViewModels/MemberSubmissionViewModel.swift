@@ -114,6 +114,7 @@ final class MemberSubmissionViewModel {
             try await db.collection("submissions").addDocument(data: [
                 "userId": userId,
                 "weekStart": Timestamp(date: weekStartDate),
+                "weekStartISO": Self.weekStartISO(from: weekStartDate),
                 "choices": choices
             ])
             hasExistingSubmissionForWeek = true
@@ -123,5 +124,13 @@ final class MemberSubmissionViewModel {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    private static func weekStartISO(from date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        let year = components.year ?? 1970
+        let month = components.month ?? 1
+        let day = components.day ?? 1
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 }

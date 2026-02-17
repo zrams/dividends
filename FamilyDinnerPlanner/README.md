@@ -19,6 +19,11 @@ Native iPhone SwiftUI app scaffold with:
 FamilyDinnerPlanner/
 ├── .gitignore
 ├── README.md
+├── firebase/
+│   └── functions/
+│       ├── index.js
+│       ├── package.json
+│       └── package-lock.json
 └── FamilyDinnerPlanner/
     ├── AppDelegate.swift
     ├── FamilyDinnerPlannerApp.swift
@@ -113,6 +118,16 @@ In Xcode target **Signing & Capabilities**:
    - Enable Push Notifications
 5. Upload APNs auth key (`.p8`) in Firebase Console under Cloud Messaging
 
+### App-side FCM behavior in this project
+
+- Notification permission requested after login (`NotificationPermissionService`).
+- If already authorized, app re-registers for remote notifications at launch/session.
+- FCM registration token is captured via `MessagingDelegate`.
+- Token is saved to Firestore at `users/{uid}.fcmToken`.
+- Push payload supports deep link:
+  - `familydinnerplanner://member-submission?weekStart=YYYY-MM-DD`
+  - App routes that link to the member submission tab.
+
 ## Firestore Data Shape (Starter)
 
 ### Collection: `users`
@@ -121,6 +136,7 @@ Document ID = Firebase Auth UID
 
 - `role: String` (`admin` or `member`)
 - `name: String` (optional display name for admin Family Choices view)
+- `fcmToken: String` (saved from iOS app for push notifications)
 
 ### Collection: `dinners`
 
@@ -144,7 +160,55 @@ Saved by `MemberSubmissionView` for `role == member`:
 
 - `userId: String`
 - `weekStart: Timestamp` (next Monday)
+- `weekStartISO: String` (`yyyy-MM-dd`)
 - `choices: [String]` (selected dinner document IDs)
+
+## Scheduled Reminder Cloud Function (Friday 5 PM EST)
+
+Cloud Function source is in:
+
+- `firebase/functions/index.js`
+
+Function:
+
+- `sendWeeklyDinnerChoiceReminders`
+- Schedule: `0 17 * * 5`
+- Timezone: `America/New_York` (5 PM Friday in ET/EST/EDT)
+- Logic:
+  1. Query `users` where `role == member`
+  2. Compute next Monday date
+  3. Query `submissions` for that week
+  4. For members without a submission, send FCM reminder
+  5. Personalized message:
+     - Title: `Dinner Choices Time!`
+     - Body: `Hi [Name], pick your top 1-2 dinners for the week of [Date]!`
+  6. Includes deep link payload to member submission screen
+
+### Deploy Cloud Function
+
+From `FamilyDinnerPlanner/firebase/functions`:
+
+1. Install Firebase CLI (if needed): `npm i -g firebase-tools`
+2. Authenticate: `firebase login`
+3. Initialize project (once): `firebase init functions`
+4. Deploy reminder function:
+   - `npm run deploy`
+
+> `onSchedule` uses Cloud Scheduler under the hood; ensure billing is enabled for scheduled functions.
+
+## Firebase Console Setup for Push (APNs + FCM)
+
+1. Open **Firebase Console > Project Settings > Cloud Messaging**
+2. Under iOS app configuration:
+   - Upload APNs Authentication Key (`.p8`)
+   - Enter Key ID and Team ID
+3. Confirm your iOS app bundle ID matches Firebase app config.
+4. In **Apple Developer**:
+   - Push Notifications enabled for the App ID
+   - APNs key is active
+5. In Firestore, each user document should contain:
+   - `role`
+   - `fcmToken` (automatically written by app after sign-in + permission)
 
 ## Auth Flow
 
