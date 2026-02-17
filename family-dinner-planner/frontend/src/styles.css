@@ -1,0 +1,116 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-top: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
+textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+button {
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.auth-toggle button {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.auth-toggle button.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.choice-list {
+  margin: 0.25rem 0 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.success {
+  color: #047857;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
