@@ -8,6 +8,7 @@ Native iPhone SwiftUI app scaffold with:
 - Auth-gated launch routing (`LoginView` vs `MainTabView`)
 - Tab-based navigation
 - Admin dashboard with searchable dinner management
+- Member submission flow with duplicate-week protection
 - Firestore-backed dinner ideas + weekly submission flow
 - Firebase Messaging hooks for push notifications
 
@@ -39,7 +40,8 @@ FamilyDinnerPlanner/
     │   ├── FirestoreService.swift
     │   └── NotificationPermissionService.swift
     ├── ViewModels/
-    │   └── AdminDashboardViewModel.swift
+    │   ├── AdminDashboardViewModel.swift
+    │   └── MemberSubmissionViewModel.swift
     └── Views/
         ├── Auth/
         │   ├── LoginView.swift
@@ -50,6 +52,7 @@ FamilyDinnerPlanner/
             ├── AdminDashboardView.swift
             ├── HomeView.swift
             ├── MainTabView.swift
+            ├── MemberSubmissionView.swift
             ├── ProfileView.swift
             └── WeeklySubmissionView.swift
 ```
@@ -133,6 +136,14 @@ Saved by `FirestoreService.submitWeeklySubmission(...)`:
 - `weekStart: Timestamp`
 - `choices: [String]` (array of dinner IDs)
 
+### Collection: `submissions`
+
+Saved by `MemberSubmissionView` for `role == member`:
+
+- `userId: String`
+- `weekStart: Timestamp` (next Monday)
+- `choices: [String]` (selected dinner document IDs)
+
 ## Auth Flow
 
 - `LaunchRouterView` shows loading state while Firebase Auth resolves session.
@@ -140,6 +151,7 @@ Saved by `FirestoreService.submitWeeklySubmission(...)`:
 - If signed in: user is routed to `MainTabView`.
 - After sign-in, `AuthService` listens to `users/{uid}` and maps `role`.
 - `AdminDashboardView` tab is shown only when `role == admin`.
+- `MemberSubmissionView` tab is shown only when `role == member`.
 
 ## Admin Dashboard
 

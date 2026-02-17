@@ -38,16 +38,15 @@ struct MainTabView: View {
                     }
                     .tag(Tab.ideas)
 
-                    NavigationStack {
-                        WeeklySubmissionView(
-                            authService: authService,
-                            firestoreService: firestoreService
-                        )
+                    if authService.userRole == .member {
+                        NavigationStack {
+                            MemberSubmissionView(authService: authService)
+                        }
+                        .tabItem {
+                            Label("Weekly Pick", systemImage: "calendar.badge.plus")
+                        }
+                        .tag(Tab.submit)
                     }
-                    .tabItem {
-                        Label("Weekly Pick", systemImage: "calendar.badge.plus")
-                    }
-                    .tag(Tab.submit)
 
                     if authService.isAdmin {
                         NavigationStack {
@@ -74,6 +73,9 @@ struct MainTabView: View {
         }
         .onChange(of: authService.userRole) { _, newRole in
             if newRole != .admin && selectedTab == .admin {
+                selectedTab = .ideas
+            }
+            if newRole != .member && selectedTab == .submit {
                 selectedTab = .ideas
             }
         }
