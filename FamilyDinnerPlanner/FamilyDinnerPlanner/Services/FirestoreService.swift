@@ -21,21 +21,25 @@ final class FirestoreService {
         isLoadingDinnerIdeas = true
         defer { isLoadingDinnerIdeas = false }
 
-        do {
-            let snapshot = try await db
-                .collection(Collections.dinners)
-                .order(by: "name")
-                .getDocuments()
+        let dinnersQuery = db
+            .collection(Collections.dinners)
+            .order(by: "name")
 
-            dinnerIdeas = snapshot.documents.map { document in
-                DinnerIdea(
-                    id: document.documentID,
-                    name: document.data()["name"] as? String ?? "Untitled Dinner",
-                    description: document.data()["description"] as? String
-                )
-            }
+        do {
+            let snapshot = try await dinnersQuery.getDocuments()
+            dinnerIdeas = mapDinnerIdeas(from: snapshot.documents)
         } catch {
-            firestoreErrorMessage = error.localizedDescription
+            do {
+                let cachedSnapshot = try await dinnersQuery.getDocuments(source: .cache)
+                dinnerIdeas = mapDinnerIdeas(from: cachedSnapshot.documents)
+                if !dinnerIdeas.isEmpty {
+                    firestoreErrorMessage = "You're offline. Showing cached dinner ideas."
+                } else {
+                    firestoreErrorMessage = error.localizedDescription
+                }
+            } catch {
+                firestoreErrorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -63,6 +67,16 @@ final class FirestoreService {
         } catch {
             firestoreErrorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    private func mapDinnerIdeas(from documents: [QueryDocumentSnapshot]) -> [DinnerIdea] {
+        documents.map { document in
+            DinnerIdea(
+                id: document.documentID,
+                name: document.data()["name"] as? String ?? "Untitled Dinner",
+                description: document.data()["description"] as? String
+            )
         }
     }
 }

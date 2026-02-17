@@ -16,7 +16,11 @@ struct FamilyDinnerPlannerApp: App {
 
         // Eagerly initialize Firebase modules used by the app.
         _ = Auth.auth()
-        _ = Firestore.firestore()
+        let firestore = Firestore.firestore()
+        let firestoreSettings = FirestoreSettings()
+        firestoreSettings.isPersistenceEnabled = true
+        firestoreSettings.cacheSizeBytes = FirestoreCacheSizeUnlimited
+        firestore.settings = firestoreSettings
         _ = Messaging.messaging()
 
         _authService = State(initialValue: AuthService())
@@ -29,6 +33,7 @@ struct FamilyDinnerPlannerApp: App {
                 authService: authService,
                 firestoreService: firestoreService
             )
+            .tint(AppTheme.accent)
         }
     }
 }

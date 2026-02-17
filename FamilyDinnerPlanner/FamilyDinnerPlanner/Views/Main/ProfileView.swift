@@ -6,22 +6,42 @@ struct ProfileView: View {
 
     var body: some View {
         Form {
-            Section("Account") {
+            Section {
                 LabeledContent("Email", value: authService.currentUser?.email ?? "Unknown")
                 LabeledContent("User ID", value: authService.currentUser?.uid ?? "Not signed in")
-            }
-
-            Section("Role") {
-                Text("Default role: \(UserRole.member.rawValue)")
-                    .foregroundStyle(.secondary)
+                LabeledContent(
+                    "Family ID",
+                    value: authService.currentFamilyId ?? "Not set"
+                )
+            } header: {
+                Label("Account", systemImage: "person.crop.circle.fill")
             }
 
             Section {
-                Button("Sign Out", role: .destructive) {
+                LabeledContent(
+                    "Role",
+                    value: authService.userRole?.rawValue.capitalized ?? "Unknown"
+                )
+                Text("Current profile name: \(authService.currentDisplayName ?? "Family Member")")
+                    .foregroundStyle(.secondary)
+            } header: {
+                Label("Membership", systemImage: "house.fill")
+            }
+
+            Section {
+                Button(role: .destructive) {
                     _ = authService.signOut()
+                } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                 }
             }
         }
         .navigationTitle("Profile")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Image(systemName: "person.circle.fill")
+                    .foregroundStyle(AppTheme.accent)
+            }
+        }
     }
 }

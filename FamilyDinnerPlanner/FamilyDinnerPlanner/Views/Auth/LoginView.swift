@@ -6,6 +6,7 @@ struct LoginView: View {
 
     @State private var email = ""
     @State private var password = ""
+    @State private var inviteCodeFromLink = ""
     @State private var isAuthenticating = false
 
     var body: some View {
@@ -52,11 +53,14 @@ struct LoginView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .tint(AppTheme.accent)
             .disabled(isAuthenticating || email.isEmpty || password.isEmpty)
 
             NavigationLink {
-                SignUpView(authService: authService)
+                SignUpView(
+                    authService: authService,
+                    prefilledInviteCode: inviteCodeFromLink.isEmpty ? nil : inviteCodeFromLink
+                )
             } label: {
                 Text("Create an Account")
             }
@@ -66,7 +70,18 @@ struct LoginView: View {
             Spacer()
         }
         .padding(24)
+        .background(
+            LinearGradient(
+                colors: [AppTheme.backgroundTop, AppTheme.backgroundBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .navigationBarTitleDisplayMode(.inline)
+        .onOpenURL { url in
+            hydrateInviteCode(from: url)
+        }
     }
 
     private func signIn() {
@@ -79,5 +94,20 @@ struct LoginView: View {
                 password: password
             )
         }
+    }
+
+    private func hydrateInviteCode(from url: URL) {
+        guard url.scheme?.lowercased() == "familydinnerplanner" else { return }
+        guard (url.host ?? "").lowercased() == "signup" || url.path.lowercased().contains("signup") else {
+            return
+        }
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let inviteCode = components.queryItems?.first(where: { $0.name == "inviteCode" })?.value,
+              !inviteCode.isEmpty else {
+            return
+        }
+
+        inviteCodeFromLink = inviteCode
     }
 }

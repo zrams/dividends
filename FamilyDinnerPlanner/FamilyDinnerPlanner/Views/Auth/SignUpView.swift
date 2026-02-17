@@ -4,16 +4,22 @@ import Observation
 struct SignUpView: View {
     @Bindable var authService: AuthService
     @Environment(\.dismiss) private var dismiss
+    let prefilledInviteCode: String? = nil
 
+    @State private var name = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var inviteCode = ""
     @State private var localErrorMessage: String?
     @State private var isCreatingAccount = false
 
     var body: some View {
         Form {
             Section("Create Account") {
+                TextField("Name (optional)", text: $name)
+                    .textInputAutocapitalization(.words)
+
                 TextField("Email", text: $email)
                     .textContentType(.emailAddress)
                     .keyboardType(.emailAddress)
@@ -25,6 +31,15 @@ struct SignUpView: View {
 
                 SecureField("Confirm Password", text: $confirmPassword)
                     .textContentType(.newPassword)
+            }
+
+            Section("Family Invite") {
+                TextField("Invite code (optional)", text: $inviteCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled(true)
+                Text("If your family admin sent a code, add it here to join the same family.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if let localErrorMessage {
@@ -61,6 +76,12 @@ struct SignUpView: View {
         }
         .navigationTitle("Sign Up")
         .navigationBarTitleDisplayMode(.inline)
+        .tint(AppTheme.accent)
+        .onAppear {
+            if inviteCode.isEmpty, let prefilledInviteCode {
+                inviteCode = prefilledInviteCode
+            }
+        }
     }
 
     private func createAccount() {
@@ -78,7 +99,9 @@ struct SignUpView: View {
 
             let success = await authService.signUp(
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines),
-                password: password
+                password: password,
+                name: name,
+                inviteCode: inviteCode
             )
 
             if success {

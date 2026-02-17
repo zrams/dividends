@@ -23,17 +23,23 @@ struct HomeView: View {
                 ContentUnavailableView(
                     "No Dinner Ideas Yet",
                     systemImage: "fork.knife",
-                    description: Text("Add documents to the 'dinners' Firestore collection.")
+                    description: Text("Ask an admin to add dinners, or check your connection for cached data.")
                 )
             } else {
                 List(firestoreService.dinnerIdeas) { dinnerIdea in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(dinnerIdea.name)
-                            .font(.headline)
-                        if let description = dinnerIdea.description, !description.isEmpty {
-                            Text(description)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "fork.knife.circle.fill")
+                            .foregroundStyle(AppTheme.accent)
+                            .font(.title3)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(dinnerIdea.name)
+                                .font(.headline)
+                            if let description = dinnerIdea.description, !description.isEmpty {
+                                Text(description)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                     .padding(.vertical, 4)
@@ -42,6 +48,17 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Dinner Ideas")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task {
+                        await firestoreService.fetchDinnerIdeas()
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+        }
         .task {
             if firestoreService.dinnerIdeas.isEmpty {
                 await firestoreService.fetchDinnerIdeas()

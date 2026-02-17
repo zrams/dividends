@@ -32,21 +32,25 @@ final class MemberSubmissionViewModel {
         errorMessage = nil
         defer { isLoadingDinners = false }
 
-        do {
-            let snapshot = try await db
-                .collection("dinners")
-                .order(by: "name")
-                .getDocuments()
+        let dinnersQuery = db
+            .collection("dinners")
+            .order(by: "name")
 
-            dinners = snapshot.documents.map { document in
-                DinnerIdea(
-                    id: document.documentID,
-                    name: document.data()["name"] as? String ?? "Untitled Dinner",
-                    description: document.data()["description"] as? String
-                )
-            }
+        do {
+            let snapshot = try await dinnersQuery.getDocuments()
+            dinners = mapDinnerIdeas(from: snapshot.documents)
         } catch {
-            errorMessage = error.localizedDescription
+            do {
+                let cachedSnapshot = try await dinnersQuery.getDocuments(source: .cache)
+                dinners = mapDinnerIdeas(from: cachedSnapshot.documents)
+                if !dinners.isEmpty {
+                    errorMessage = "You're offline. Showing cached dinner ideas."
+                } else {
+                    errorMessage = error.localizedDescription
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -55,20 +59,31 @@ final class MemberSubmissionViewModel {
         errorMessage = nil
         defer { isCheckingExistingSubmission = false }
 
-        do {
-            let existing = try await db
-                .collection("submissions")
-                .whereField("userId", isEqualTo: userId)
-                .whereField("weekStart", isEqualTo: Timestamp(date: weekStartDate))
-                .limit(to: 1)
-                .getDocuments()
+        let existingQuery = db
+            .collection("submissions")
+            .whereField("userId", isEqualTo: userId)
+            .whereField("weekStart", isEqualTo: Timestamp(date: weekStartDate))
+            .limit(to: 1)
 
+        do {
+            let existing = try await existingQuery.getDocuments()
             hasExistingSubmissionForWeek = !existing.documents.isEmpty
             if hasExistingSubmissionForWeek {
                 selectedDinnerIDs = []
             }
         } catch {
-            errorMessage = error.localizedDescription
+            do {
+                let cachedExisting = try await existingQuery.getDocuments(source: .cache)
+                hasExistingSubmissionForWeek = !cachedExisting.documents.isEmpty
+                if hasExistingSubmissionForWeek {
+                    selectedDinnerIDs = []
+                    errorMessage = "Offline mode: using cached submission status."
+                } else {
+                    errorMessage = "Offline mode: unable to verify prior submission."
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -132,5 +147,15 @@ final class MemberSubmissionViewModel {
         let month = components.month ?? 1
         let day = components.day ?? 1
         return String(format: "%04d-%02d-%02d", year, month, day)
+    }
+
+    private func mapDinnerIdeas(from documents: [QueryDocumentSnapshot]) -> [DinnerIdea] {
+        documents.map { document in
+            DinnerIdea(
+                id: document.documentID,
+                name: document.data()["name"] as? String ?? "Untitled Dinner",
+                description: document.data()["description"] as? String
+            )
+        }
     }
 }

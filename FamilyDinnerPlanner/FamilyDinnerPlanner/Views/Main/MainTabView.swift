@@ -5,7 +5,9 @@ struct MainTabView: View {
     enum Tab {
         case ideas
         case submit
+        case history
         case admin
+        case family
         case profile
     }
 
@@ -46,6 +48,14 @@ struct MainTabView: View {
                             Label("Weekly Pick", systemImage: "calendar.badge.plus")
                         }
                         .tag(Tab.submit)
+
+                        NavigationStack {
+                            MemberHistoryView(authService: authService)
+                        }
+                        .tabItem {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                        .tag(Tab.history)
                     }
 
                     if authService.isAdmin {
@@ -53,9 +63,17 @@ struct MainTabView: View {
                             AdminDashboardView(authService: authService)
                         }
                         .tabItem {
-                            Label("Admin", systemImage: "person.3.sequence.fill")
+                            Label("Admin", systemImage: "slider.horizontal.3")
                         }
                         .tag(Tab.admin)
+
+                        NavigationStack {
+                            FamilyManagementView(authService: authService)
+                        }
+                        .tabItem {
+                            Label("Family", systemImage: "person.2.fill")
+                        }
+                        .tag(Tab.family)
                     }
 
                     NavigationStack {
@@ -78,10 +96,17 @@ struct MainTabView: View {
             if newRole != .admin && selectedTab == .admin {
                 selectedTab = .ideas
             }
+            if newRole != .admin && selectedTab == .family {
+                selectedTab = .ideas
+            }
             if newRole != .member && selectedTab == .submit {
                 selectedTab = .ideas
             }
+            if newRole != .member && selectedTab == .history {
+                selectedTab = .ideas
+            }
         }
+        .tint(AppTheme.accent)
         .alert(
             "Unable to Load Role",
             isPresented: showRoleErrorAlert,

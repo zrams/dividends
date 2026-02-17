@@ -59,6 +59,12 @@ struct AdminDashboardView: View {
             }
         }
         .navigationTitle("Admin Dashboard")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Image(systemName: "flame.fill")
+                    .foregroundStyle(AppTheme.accent)
+            }
+        }
         .task {
             viewModel.startListening()
         }
@@ -125,11 +131,12 @@ struct AdminDashboardView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .tint(AppTheme.accent)
     }
 
     @ViewBuilder
     private var dinnerManagementSections: some View {
-        Section("Add New Dinner") {
+        Section {
             TextField("Dinner name (required)", text: $viewModel.addName)
                 .textInputAutocapitalization(.words)
 
@@ -150,9 +157,11 @@ struct AdminDashboardView: View {
                 }
             }
             .disabled(viewModel.isSaving || !isAdmin)
+        } header: {
+            Label("Add New Dinner", systemImage: "fork.knife.circle")
         }
 
-        Section("Dinner Ideas (\(viewModel.allDinners.count))") {
+        Section {
             if viewModel.visibleDinners.isEmpty {
                 ContentUnavailableView(
                     "No Dinners Found",
@@ -186,12 +195,14 @@ struct AdminDashboardView: View {
                     viewModel.loadMoreIfNeeded(currentItem: nil)
                 }
             }
+        } header: {
+            Label("Dinner Ideas (\(viewModel.allDinners.count))", systemImage: "list.bullet.rectangle")
         }
     }
 
     @ViewBuilder
     private var familyChoicesSections: some View {
-        Section("Family Choices") {
+        Section {
             DatePicker(
                 "Week Starting (Monday)",
                 selection: weekSelectionBinding,
@@ -201,9 +212,11 @@ struct AdminDashboardView: View {
             Text("Live submissions for week of \(formattedDate(viewModel.selectedWeekStartDate)).")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+        } header: {
+            Label("Family Choices", systemImage: "person.3")
         }
 
-        Section("Member Submissions") {
+        Section {
             if viewModel.isLoadingFamilyChoices && viewModel.familyChoicesByUser.isEmpty {
                 ProgressView("Loading submissions...")
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -218,6 +231,8 @@ struct AdminDashboardView: View {
                     FamilyChoicesRow(choiceGroup: choiceGroup)
                 }
             }
+        } header: {
+            Label("Member Submissions", systemImage: "tray.full")
         }
     }
 

@@ -38,7 +38,7 @@ struct MemberSubmissionView: View {
             } else {
                 List {
                     Section("Upcoming Week") {
-                        Text("Week starts on \(formattedWeekStart) (next Monday).")
+                        Label("Week starts on \(formattedWeekStart) (next Monday).", systemImage: "calendar.badge.clock")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -59,7 +59,7 @@ struct MemberSubmissionView: View {
                             ContentUnavailableView(
                                 "No Dinners Available",
                                 systemImage: "fork.knife",
-                                description: Text("Ask an admin to add dinner ideas.")
+                                description: Text("Ask an admin to add dinners, or check your connection for cached data.")
                             )
                         } else {
                             ForEach(viewModel.dinners) { dinner in
@@ -98,6 +98,12 @@ struct MemberSubmissionView: View {
             }
         }
         .navigationTitle("Member Submission")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Image(systemName: "fork.knife.circle.fill")
+                    .foregroundStyle(AppTheme.accent)
+            }
+        }
         .task {
             guard let userId = authService.currentUser?.uid else { return }
             await viewModel.loadInitialState(userId: userId, weekStartDate: weekStartDate)

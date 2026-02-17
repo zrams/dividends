@@ -10,6 +10,8 @@ Native iPhone SwiftUI app scaffold with:
 - Admin dashboard with searchable dinner management
 - Member submission flow with duplicate-week protection
 - Admin family choices view with live weekly submission updates
+- Admin family management screen with invite flow
+- Member submission history for past weeks
 - Firestore-backed dinner ideas + weekly submission flow
 - Firebase Messaging hooks for push notifications
 
@@ -32,6 +34,9 @@ FamilyDinnerPlanner/
     │   └── Info.plist
     ├── Models/
     │   ├── DinnerIdea.swift
+    │   ├── FamilyInvite.swift
+    │   ├── FamilyMember.swift
+    │   ├── MemberSubmissionHistoryItem.swift
     │   ├── UserRole.swift
     │   └── WeeklySubmission.swift
     ├── Resources/
@@ -47,7 +52,11 @@ FamilyDinnerPlanner/
     │   └── NotificationPermissionService.swift
     ├── ViewModels/
     │   ├── AdminDashboardViewModel.swift
+    │   ├── FamilyManagementViewModel.swift
+    │   ├── MemberHistoryViewModel.swift
     │   └── MemberSubmissionViewModel.swift
+    ├── Theme/
+    │   └── AppTheme.swift
     └── Views/
         ├── Auth/
         │   ├── LoginView.swift
@@ -56,8 +65,10 @@ FamilyDinnerPlanner/
         │   └── LaunchRouterView.swift
         └── Main/
             ├── AdminDashboardView.swift
+            ├── FamilyManagementView.swift
             ├── HomeView.swift
             ├── MainTabView.swift
+            ├── MemberHistoryView.swift
             ├── MemberSubmissionView.swift
             ├── ProfileView.swift
             └── WeeklySubmissionView.swift
@@ -137,6 +148,7 @@ Document ID = Firebase Auth UID
 - `role: String` (`admin` or `member`)
 - `name: String` (optional display name for admin Family Choices view)
 - `fcmToken: String` (saved from iOS app for push notifications)
+- `familyId: String` (groups users into a family)
 
 ### Collection: `dinners`
 
@@ -162,6 +174,21 @@ Saved by `MemberSubmissionView` for `role == member`:
 - `weekStart: Timestamp` (next Monday)
 - `weekStartISO: String` (`yyyy-MM-dd`)
 - `choices: [String]` (selected dinner document IDs)
+
+### Collection: `invites`
+
+Created by admin users in Family Management:
+
+- `code: String` (invite code entered during signup)
+- `familyId: String`
+- `inviteEmail: String`
+- `inviteEmailLowercase: String`
+- `inviteLink: String` (custom app link with invite code)
+- `status: String` (`active` or `claimed`)
+- `createdBy: String`
+- `createdAt: Timestamp`
+- `claimedBy: String` (set when claimed)
+- `claimedAt: Timestamp` (set when claimed)
 
 ## Scheduled Reminder Cloud Function (Friday 5 PM EST)
 
@@ -218,6 +245,7 @@ From `FamilyDinnerPlanner/firebase/functions`:
 - After sign-in, `AuthService` listens to `users/{uid}` and maps `role`.
 - `AdminDashboardView` tab is shown only when `role == admin`.
 - `MemberSubmissionView` tab is shown only when `role == member`.
+- Signup accepts an optional invite code and claims `familyId` from `invites`.
 
 ## Admin Dashboard
 
@@ -235,6 +263,30 @@ From `FamilyDinnerPlanner/firebase/functions`:
 - Loading and error states (`ProgressView`, alerts)
 
 Admin write operations are guarded in both UI and view-model methods.
+
+## Family Management (Admin)
+
+`FamilyManagementView` includes:
+
+- Live member list from `users` filtered by `familyId`
+- Name + email display for each member
+- Invite creation by email (writes to `invites`)
+- Generated invite code/link, shareable in-app
+
+## Member History
+
+`MemberHistoryView` includes:
+
+- Past submission history for the signed-in member
+- Dinner ID -> dinner name lookup for readable history
+- Live updates when submissions change
+
+## Offline and iPhone optimization
+
+- Firestore persistence is explicitly enabled at app launch.
+- Dinner-loading flows attempt cache fallback when offline.
+- Listener-based screens can render cached data if available.
+- App is configured for iPhone-only UI (portrait-first orientation and iPhone device family).
 
 For true enforcement across all clients, configure Firestore Security Rules so only admins can write `dinners`, for example:
 
