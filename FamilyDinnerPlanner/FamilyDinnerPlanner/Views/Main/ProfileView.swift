@@ -3,6 +3,18 @@ import Observation
 
 struct ProfileView: View {
     @Bindable var authService: AuthService
+    @State private var showSignOutConfirmation = false
+
+    private var showSignOutErrorAlert: Binding<Bool> {
+        Binding(
+            get: { authService.authErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    authService.authErrorMessage = nil
+                }
+            }
+        )
+    }
 
     var body: some View {
         Form {
@@ -30,7 +42,7 @@ struct ProfileView: View {
 
             Section {
                 Button(role: .destructive) {
-                    _ = authService.signOut()
+                    showSignOutConfirmation = true
                 } label: {
                     Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
                 }
@@ -43,5 +55,37 @@ struct ProfileView: View {
                     .foregroundStyle(AppTheme.accent)
             }
         }
+        .confirmationDialog(
+            "Sign out of FamilyDinnerPlanner?",
+            isPresented: $showSignOutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Sign Out", role: .destructive) {
+                _ = authService.signOut()
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert(
+            signOutFailureTitle,
+            isPresented: showSignOutErrorAlert,
+            actions: {
+                Button("OK", role: .cancel) {
+                    authService.authErrorMessage = nil
+                }
+            },
+            message: {
+                Text(authService.authErrorMessage ?? "Unable to sign out. Please try again.")
+            }
+        )
+    }
+
+    private var signOutFailureTitle: String {
+        guard let message = authService.authErrorMessage?.lowercased() else {
+            return "Sign Out Failed"
+        }
+        if message.contains("network") || message.contains("internet") {
+            return "Network Error"
+        }
+        return "Sign Out Failed"
     }
 }

@@ -101,7 +101,11 @@ final class MemberSubmissionViewModel {
         selectedDinnerIDs.insert(dinnerID)
     }
 
-    func submit(userId: String, weekStartDate: Date) async -> Bool {
+    func submit(
+        userId: String,
+        weekStartDate: Date,
+        familyId: String?
+    ) async -> Bool {
         guard canSubmit else {
             if hasExistingSubmissionForWeek {
                 errorMessage = "You already submitted choices for this week."
@@ -126,12 +130,18 @@ final class MemberSubmissionViewModel {
 
         do {
             let choices = Array(selectedDinnerIDs).sorted()
-            try await db.collection("submissions").addDocument(data: [
+            var payload: [String: Any] = [
                 "userId": userId,
                 "weekStart": Timestamp(date: weekStartDate),
                 "weekStartISO": Self.weekStartISO(from: weekStartDate),
                 "choices": choices
-            ])
+            ]
+
+            if let familyId, !familyId.isEmpty {
+                payload["familyId"] = familyId
+            }
+
+            try await db.collection("submissions").addDocument(data: payload)
             hasExistingSubmissionForWeek = true
             selectedDinnerIDs = []
             return true

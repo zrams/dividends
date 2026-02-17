@@ -133,11 +133,16 @@ struct MemberSubmissionView: View {
 
     private func submitSelection() {
         guard let userId = authService.currentUser?.uid else { return }
+        guard let familyId = authService.currentFamilyId, !familyId.isEmpty else {
+            viewModel.errorMessage = "Family setup is incomplete. Please sign out and back in."
+            return
+        }
 
         Task {
             let success = await viewModel.submit(
                 userId: userId,
-                weekStartDate: weekStartDate
+                weekStartDate: weekStartDate,
+                familyId: familyId
             )
             if success {
                 showConfirmationAlert = true

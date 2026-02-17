@@ -66,7 +66,10 @@ struct AdminDashboardView: View {
             }
         }
         .task {
-            viewModel.startListening()
+            viewModel.startListening(familyId: authService.currentFamilyId)
+        }
+        .onChange(of: authService.currentFamilyId) { _, newFamilyId in
+            viewModel.startListening(familyId: newFamilyId)
         }
         .onDisappear {
             viewModel.stopListening()

@@ -22,7 +22,9 @@ FamilyDinnerPlanner/
 ├── .gitignore
 ├── README.md
 ├── firebase/
+│   ├── firestore.rules
 │   └── functions/
+│       ├── README.md
 │       ├── index.js
 │       ├── package.json
 │       └── package-lock.json
@@ -108,6 +110,28 @@ Recommended new project settings:
    - `FirebaseFirestore`
    - `FirebaseMessaging`
 
+### CocoaPods alternative (optional)
+
+If your team prefers CocoaPods, this is a compatible Podfile snippet:
+
+```ruby
+platform :ios, '18.0'
+use_frameworks!
+
+target 'FamilyDinnerPlanner' do
+  pod 'Firebase/Core'
+  pod 'Firebase/Auth'
+  pod 'Firebase/Firestore'
+  pod 'Firebase/Messaging'
+end
+```
+
+Then run:
+
+```bash
+pod install
+```
+
 ## Add `GoogleService-Info.plist`
 
 1. In Firebase Console, create/select your iOS app (`Bundle ID` must match Xcode target).
@@ -138,6 +162,21 @@ In Xcode target **Signing & Capabilities**:
 - Push payload supports deep link:
   - `familydinnerplanner://member-submission?weekStart=YYYY-MM-DD`
   - App routes that link to the member submission tab.
+
+## App Icon and Launch Screen suggestions
+
+For a simple kitchen-style visual identity:
+
+- **App Icon idea**
+  - SF Symbol inspiration: `fork.knife.circle.fill`
+  - Warm palette: orange / cream / soft red background
+  - Keep icon shape bold and legible at small sizes
+- **Launch Screen idea**
+  - Light warm gradient background (already scaffolded in app)
+  - Centered plate/fork symbol
+  - Minimal text: `FamilyDinnerPlanner`
+
+In production, replace the placeholder `AppIcon.appiconset` contents with exported PNGs for all required sizes.
 
 ## Firestore Data Shape (Starter)
 
@@ -173,6 +212,7 @@ Saved by `MemberSubmissionView` for `role == member`:
 - `userId: String`
 - `weekStart: Timestamp` (next Monday)
 - `weekStartISO: String` (`yyyy-MM-dd`)
+- `familyId: String` (written when available for family-scoped filtering)
 - `choices: [String]` (selected dinner document IDs)
 
 ### Collection: `invites`
@@ -237,6 +277,36 @@ From `FamilyDinnerPlanner/firebase/functions`:
    - `role`
    - `fcmToken` (automatically written by app after sign-in + permission)
 
+## Testing checklist (Simulator and Device)
+
+### Simulator
+
+- Auth and Firestore flows work in simulator.
+- Deep link routing can be tested with:
+  - `xcrun simctl openurl booted "familydinnerplanner://member-submission"`
+- Push notifications via APNs are limited in simulator compared to real devices.
+
+### Physical iPhone (recommended for push validation)
+
+1. Install app from Xcode on a real device.
+2. Sign in with a test member account.
+3. Accept notification permission prompt.
+4. Confirm `users/{uid}.fcmToken` appears in Firestore.
+5. Send a test FCM notification from Firebase Console.
+6. Verify deep link opens member submission screen.
+
+## TestFlight steps for family beta testing
+
+1. In Xcode, archive a Release build.
+2. Upload to App Store Connect.
+3. Add internal testers first (your team/family organizers).
+4. Add external testers after Apple beta review (if needed).
+5. Share feedback form/checklist for:
+   - signup + invite code
+   - dinner submission
+   - admin family management
+   - push reminder delivery timing
+
 ## Auth Flow
 
 - `LaunchRouterView` shows loading state while Firebase Auth resolves session.
@@ -246,6 +316,7 @@ From `FamilyDinnerPlanner/firebase/functions`:
 - `AdminDashboardView` tab is shown only when `role == admin`.
 - `MemberSubmissionView` tab is shown only when `role == member`.
 - Signup accepts an optional invite code and claims `familyId` from `invites`.
+- Profile includes sign-out (logout) confirmation and failure alerts.
 
 ## Admin Dashboard
 
@@ -288,19 +359,52 @@ Admin write operations are guarded in both UI and view-model methods.
 - Listener-based screens can render cached data if available.
 - App is configured for iPhone-only UI (portrait-first orientation and iPhone device family).
 
-For true enforcement across all clients, configure Firestore Security Rules so only admins can write `dinners`, for example:
+## Production baseline security rules
+
+For production, enforce family and role restrictions in Firestore Security Rules.
+This repository includes a starter rules file:
+
+- `firebase/firestore.rules`
+
+Core pattern used:
+
+- read/write only for authenticated users
+- member-owned documents restricted to `request.auth.uid`
+- admin-only operations gated by `users/{uid}.role == "admin"`
+- family-scoped documents validated against `familyId`
+
+Example snippet:
 
 ```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function requesterDocExists() {
+      return signedIn() && exists(userPath(request.auth.uid));
+    }
+
+    function requesterRole() {
+      return requesterDocExists() ? get(userPath(request.auth.uid)).data.role : null;
+    }
+
+    function requesterFamilyId() {
+      return requesterDocExists() ? get(userPath(request.auth.uid)).data.familyId : null;
+    }
+
     function isAdmin() {
-      return request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      return signedIn() && requesterRole() == "admin";
     }
 
     match /dinners/{dinnerId} {
-      allow read: if request.auth != null;
+      allow read: if signedIn();
       allow create, update, delete: if isAdmin();
     }
   }

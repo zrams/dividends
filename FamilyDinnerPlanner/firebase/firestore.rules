@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function requesterDocExists() {
+      return signedIn() && exists(userPath(request.auth.uid));
+    }
+
+    function requesterRole() {
+      return requesterDocExists() ? get(userPath(request.auth.uid)).data.role : null;
+    }
+
+    function requesterFamilyId() {
+      return requesterDocExists() ? get(userPath(request.auth.uid)).data.familyId : null;
+    }
+
+    function isAdmin() {
+      return signedIn() && requesterRole() == "admin";
+    }
+
+    function sameFamily(familyId) {
+      return requesterFamilyId() != null && familyId == requesterFamilyId();
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() &&
+        (request.auth.uid == userId || (isAdmin() && sameFamily(resource.data.familyId)));
+      allow update: if signedIn() &&
+        (request.auth.uid == userId || (isAdmin() && sameFamily(resource.data.familyId)));
+      allow delete: if false;
+    }
+
+    match /dinners/{dinnerId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /submissions/{submissionId} {
+      allow create: if signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        sameFamily(request.resource.data.familyId);
+
+      allow read: if signedIn() &&
+        (resource.data.userId == request.auth.uid || (isAdmin() && sameFamily(resource.data.familyId)));
+
+      allow update, delete: if false;
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isAdmin() && sameFamily(resource.data.familyId);
+      allow create: if isAdmin() && sameFamily(request.resource.data.familyId);
+
+      allow update: if
+        // Admin can manage invites for their own family.
+        (isAdmin() && sameFamily(resource.data.familyId)) ||
+        // A signed-in user can claim an active invite assigned to their email.
+        (
+          signedIn() &&
+          resource.data.status == "active" &&
+          request.resource.data.status == "claimed" &&
+          request.resource.data.claimedBy == request.auth.uid &&
+          request.resource.data.familyId == resource.data.familyId
+        );
+
+      allow delete: if isAdmin() && sameFamily(resource.data.familyId);
+    }
+  }
+}

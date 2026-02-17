@@ -9,6 +9,17 @@ struct LoginView: View {
     @State private var inviteCodeFromLink = ""
     @State private var isAuthenticating = false
 
+    private var showAuthErrorAlert: Binding<Bool> {
+        Binding(
+            get: { authService.authErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    authService.authErrorMessage = nil
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
@@ -31,14 +42,6 @@ struct LoginView: View {
                 SecureField("Password", text: $password)
                     .textContentType(.password)
                     .textFieldStyle(.roundedBorder)
-            }
-
-            if let authErrorMessage = authService.authErrorMessage {
-                Text(authErrorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Button {
@@ -82,6 +85,18 @@ struct LoginView: View {
         .onOpenURL { url in
             hydrateInviteCode(from: url)
         }
+        .alert(
+            authFailureTitle,
+            isPresented: showAuthErrorAlert,
+            actions: {
+                Button("OK", role: .cancel) {
+                    authService.authErrorMessage = nil
+                }
+            },
+            message: {
+                Text(authService.authErrorMessage ?? "Please try again.")
+            }
+        )
     }
 
     private func signIn() {
@@ -109,5 +124,15 @@ struct LoginView: View {
         }
 
         inviteCodeFromLink = inviteCode
+    }
+
+    private var authFailureTitle: String {
+        guard let message = authService.authErrorMessage?.lowercased() else {
+            return "Authentication Failed"
+        }
+        if message.contains("network") || message.contains("internet") {
+            return "Network Error"
+        }
+        return "Authentication Failed"
     }
 }

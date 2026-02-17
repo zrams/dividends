@@ -17,6 +17,7 @@ final class AdminDashboardViewModel {
     private var userListeners: [String: ListenerRegistration] = [:]
     private var submissionChoicesByUser: [String: [String]] = [:]
     private var userDisplayNames: [String: String] = [:]
+    private var selectedFamilyId: String?
     private let lazyPageSize = 25
     private var visibleCount = 25
 
@@ -68,9 +69,18 @@ final class AdminDashboardViewModel {
             }
     }
 
-    func startListening() {
+    func startListening(familyId: String?) {
+        let normalizedFamilyId = normalizedFamilyId(from: familyId)
+        let didChangeFamily = normalizedFamilyId != selectedFamilyId
+        selectedFamilyId = normalizedFamilyId
+
         startDinnerIdeasListenerIfNeeded()
-        startSubmissionsListener(for: selectedWeekStartDate)
+        if submissionsListener == nil || didChangeFamily {
+            startSubmissionsListener(
+                for: selectedWeekStartDate,
+                familyId: normalizedFamilyId
+            )
+        }
     }
 
     func stopListening() {
@@ -86,6 +96,7 @@ final class AdminDashboardViewModel {
         userListeners.removeAll()
         userDisplayNames.removeAll()
         submissionChoicesByUser.removeAll()
+        selectedFamilyId = nil
     }
 
     func updateSelectedWeekStart(_ date: Date) {
@@ -95,7 +106,10 @@ final class AdminDashboardViewModel {
         }
 
         selectedWeekStartDate = normalizedDate
-        startSubmissionsListener(for: normalizedDate)
+        startSubmissionsListener(
+            for: normalizedDate,
+            familyId: selectedFamilyId
+        )
     }
 
     func loadMoreIfNeeded(currentItem: DinnerIdea?) {
@@ -247,7 +261,10 @@ final class AdminDashboardViewModel {
             }
     }
 
-    private func startSubmissionsListener(for weekStartDate: Date) {
+    private func startSubmissionsListener(
+        for weekStartDate: Date,
+        familyId: String?
+    ) {
         submissionsListener?.remove()
         submissionsListener = nil
 
@@ -256,9 +273,15 @@ final class AdminDashboardViewModel {
 
         let weekTimestamp = Timestamp(date: weekStartDate)
 
-        submissionsListener = db
+        var submissionsQuery: Query = db
             .collection("submissions")
             .whereField("weekStart", isEqualTo: weekTimestamp)
+
+        if let familyId, !familyId.isEmpty {
+            submissionsQuery = submissionsQuery.whereField("familyId", isEqualTo: familyId)
+        }
+
+        submissionsListener = submissionsQuery
             .addSnapshotListener { [weak self] snapshot, error in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -282,6 +305,11 @@ final class AdminDashboardViewModel {
                     self.isLoadingFamilyChoices = false
                 }
             }
+    }
+
+    private func normalizedFamilyId(from familyId: String?) -> String? {
+        let normalized = familyId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return normalized.isEmpty ? nil : normalized
     }
 
     private func syncUserListeners(for userIDs: Set<String>) {
