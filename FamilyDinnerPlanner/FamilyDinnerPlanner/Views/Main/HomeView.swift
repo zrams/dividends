@@ -23,7 +23,7 @@ struct HomeView: View {
                 ContentUnavailableView(
                     "No Dinner Ideas Yet",
                     systemImage: "fork.knife",
-                    description: Text("Add documents to the 'dinnerIdeas' Firestore collection.")
+                    description: Text("Add documents to the 'dinners' Firestore collection.")
                 )
             } else {
                 List(firestoreService.dinnerIdeas) { dinnerIdea in

@@ -6,7 +6,7 @@ import Observation
 @Observable
 final class FirestoreService {
     private enum Collections {
-        static let dinnerIdeas = "dinnerIdeas"
+        static let dinners = "dinners"
         static let weeklySubmissions = "weeklySubmissions"
     }
 
@@ -23,7 +23,7 @@ final class FirestoreService {
 
         do {
             let snapshot = try await db
-                .collection(Collections.dinnerIdeas)
+                .collection(Collections.dinners)
                 .order(by: "name")
                 .getDocuments()
 

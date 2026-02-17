@@ -4,8 +4,10 @@ Native iPhone SwiftUI app scaffold with:
 
 - Firebase initialization in `@main` app entry point
 - Email/password auth (login + sign up)
+- Role loading from Firestore user profile (`users/{uid}.role`)
 - Auth-gated launch routing (`LoginView` vs `MainTabView`)
 - Tab-based navigation
+- Admin dashboard with searchable dinner management
 - Firestore-backed dinner ideas + weekly submission flow
 - Firebase Messaging hooks for push notifications
 
@@ -36,6 +38,8 @@ FamilyDinnerPlanner/
     │   ├── AuthService.swift
     │   ├── FirestoreService.swift
     │   └── NotificationPermissionService.swift
+    ├── ViewModels/
+    │   └── AdminDashboardViewModel.swift
     └── Views/
         ├── Auth/
         │   ├── LoginView.swift
@@ -43,6 +47,7 @@ FamilyDinnerPlanner/
         ├── Launch/
         │   └── LaunchRouterView.swift
         └── Main/
+            ├── AdminDashboardView.swift
             ├── HomeView.swift
             ├── MainTabView.swift
             ├── ProfileView.swift
@@ -106,7 +111,13 @@ In Xcode target **Signing & Capabilities**:
 
 ## Firestore Data Shape (Starter)
 
-### Collection: `dinnerIdeas`
+### Collection: `users`
+
+Document ID = Firebase Auth UID
+
+- `role: String` (`admin` or `member`)
+
+### Collection: `dinners`
 
 Documents can include:
 
@@ -127,4 +138,38 @@ Saved by `FirestoreService.submitWeeklySubmission(...)`:
 - `LaunchRouterView` shows loading state while Firebase Auth resolves session.
 - If signed out: user is routed to `LoginView`.
 - If signed in: user is routed to `MainTabView`.
+- After sign-in, `AuthService` listens to `users/{uid}` and maps `role`.
+- `AdminDashboardView` tab is shown only when `role == admin`.
+
+## Admin Dashboard
+
+`AdminDashboardView` includes:
+
+- Live Firestore listener on `dinners` ordered by `name`
+- `.searchable()` filter by name/description
+- Add dinner form (name required, description optional)
+- Per-row Edit/Delete actions
+- Lazy list expansion in chunks for larger dinner lists
+- Loading and error states (`ProgressView`, alerts)
+
+Admin write operations are guarded in both UI and view-model methods.
+
+For true enforcement across all clients, configure Firestore Security Rules so only admins can write `dinners`, for example:
+
+```text
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    match /dinners/{dinnerId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
+```
 
